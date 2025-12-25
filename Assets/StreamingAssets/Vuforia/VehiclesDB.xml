@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QCARConfig>
+  <Tracking>
+    <ImageTarget name="9_fire_truck" size="1.000000 1.285714" />
+    <ImageTarget name="10_police_car" size="1.000000 1.286432" />
+    <ImageTarget name="8_ambulance" size="1.000000 1.132743" />
+    <ImageTarget name="7_truck" size="1.000000 1.286432" />
+    <ImageTarget name="6_train" size="1.000000 1.286432" />
+    <ImageTarget name="5_helicopter" size="1.000000 1.286432" />
+    <ImageTarget name="4_airplane" size="1.000000 1.286432" />
+    <ImageTarget name="3_ship" size="1.000000 1.286432" />
+    <ImageTarget name="2_motorcycle" size="1.000000 1.286432" />
+    <ImageTarget name="1_car" size="1.000000 0.828125" />
+  </Tracking>
+</QCARConfig>
