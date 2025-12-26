@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 public class AuthManager : MonoBehaviour
 {
     [Header("GÝRÝÞ EKRANI (Ana Sahne)")]
+    public GameObject mainPanel;
     public InputField girisEmailInput;
     public InputField girisPasswordInput;
     public TextMeshProUGUI bildirimText;
@@ -29,6 +30,7 @@ public class AuthManager : MonoBehaviour
 
     public void KayitPaneliniAc()
     {
+        mainPanel.SetActive(false);
         kayitPaneli.SetActive(true);
         bildirimText.text = ""; 
     }
@@ -36,6 +38,7 @@ public class AuthManager : MonoBehaviour
     public void KayitPaneliniKapat()
     {
         kayitPaneli.SetActive(false);
+        mainPanel.SetActive(true);
     }
 
     public void KayitOl()
