@@ -44,6 +44,8 @@ MonoBehaviour:
   - RPC_StartGame
   - RPC_WinGame
   - RPC_SetupRound
+  - RPC_FinishGame
+  - RPC_UpdateOpponentScore
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

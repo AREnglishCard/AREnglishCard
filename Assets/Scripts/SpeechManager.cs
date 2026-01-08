@@ -1,4 +1,5 @@
-﻿using System;
+﻿using UnityEngine.Android;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -13,7 +14,7 @@ public class SpeechManager : MonoBehaviour
     public static SpeechManager Instance;
 
     [Header("Gemini Ayarları")]
-    public string geminiApiKey = "BURAYA_API_KEY_YAZIN";
+    private static string geminiApiKey = "AIzaSyBOb9ZiObkh5u-qAUogWPiwDHmaDeIoVJU";
     private const string API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     [Header("UI Bağlantıları")]
