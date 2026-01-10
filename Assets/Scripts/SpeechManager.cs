@@ -14,7 +14,7 @@ public class SpeechManager : MonoBehaviour
     public static SpeechManager Instance;
 
     [Header("Gemini Ayarları")]
-    private const string geminiApiKey = "AIzaSyDFkjdtWYmJ7daLJmyYLAJbufSJmPfnG6w";
+    private static string geminiApiKey = "AIzaSyBOb9ZiObkh5u-qAUogWPiwDHmaDeIoVJU";
     private const string API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     [Header("UI Bağlantıları")]
@@ -137,21 +137,17 @@ public class SpeechManager : MonoBehaviour
                 return;
             }
 
-            // Önceki kaydı temizle
-            Microphone.End(currentDeviceName);
-
             isRecording = true;
+            Microphone.End(currentDeviceName); // Temizle
+
             int kayitSuresi = puanlamaCumleIcinMi ? 8 : 4;
 
-            // --- DÜZELTME BURADA ---
-            // Cihazdan maxFreq çekmek yerine 44100'e sabitliyoruz.
-            // Bu, Error 60 hatasını %90 çözer çünkü Unity en iyi 44100 ile çalışır.
-            int finalFreq = 44100;
+            // DÜZELTME: Frekansı elle vermiyoruz, cihaz ne istiyorsa onu veriyoruz (maxFreq)
+            Microphone.GetDeviceCaps(currentDeviceName, out int minFreq, out int maxFreq);
+            int finalFreq = (maxFreq > 0) ? maxFreq : 44100; // Cihaz ne destekliyorsa o, yoksa 44100
 
             try
             {
-                // currentDeviceName null ise varsayılan mikrofonu kullanır, bu daha güvenlidir.
-                // Eğer dropdown'dan seçilen isimde sorun varsa null deneyebilirsin.
                 recordingClip = Microphone.Start(currentDeviceName, false, kayitSuresi, finalFreq);
 
                 if (scoreText) scoreText.text = "DİNLİYORUM...";
@@ -161,7 +157,7 @@ public class SpeechManager : MonoBehaviour
             catch (Exception e)
             {
                 Debug.LogError("Mikrofon Hatası: " + e.Message);
-                scoreText.text = "Mic Başlatılamadı! (Ayarları Kontrol Et)";
+                scoreText.text = "Mic Başlatılamadı!";
                 isRecording = false;
             }
         }
@@ -169,26 +165,22 @@ public class SpeechManager : MonoBehaviour
         {
             isRecording = false;
 
-            // Pozisyonu al
+            // Eğer Unity kaydı kendiliğinden durdurduysa (süre bittiyse) pozisyon sıfırlanmış olabilir
             int position = Microphone.GetPosition(currentDeviceName);
-
-            // Kaydı durdur
             Microphone.End(currentDeviceName);
 
             if (scoreText) scoreText.text = "Analiz...";
             if (labelToChange) labelToChange.text = puanlamaCumleIcinMi ? "CÜMLE PUANLA" : "KELİME PUANLA";
 
-            // Eğer kayıt hiç başlamadıysa veya çok kısaysa hata vermemesi için koruma
-            if (recordingClip == null) return;
-
-            // Eğer süre dolup durduysa position 0 döner, tüm klibi al
+            // Eğer süre dolup durduysa position 0 dönebilir, bu durumda tüm klibi al
             if (position <= 0) position = recordingClip.samples;
 
             byte[] wavData = ConvertToWav(recordingClip, position);
 
+            // Wav datası null ise ses 0 demektir (ConvertToWav içinde kontrol var)
             if (wavData == null)
             {
-                scoreText.text = "SES ALINAMADI\n(Seviye: 0)";
+                scoreText.text = "MİKROFON SES ALMIYOR\n(Ses Seviyesi: 0)";
                 scoreText.color = Color.red;
                 return;
             }
@@ -259,34 +251,12 @@ public class SpeechManager : MonoBehaviour
                     string hedef = puanlamaCumleIcinMi ? aktifCumle : aktifKelime;
                     int score = CalculateScore(hedef, spokenText);
 
-                    try
+                    if (DatabaseManager.Instance != null)
                     {
-                        // 1. GameManager Varsa Gönder
-                        if (GameManager.Instance != null)
-                        {
-                            GameManager.Instance.OnSpeechScoreReceived(score);
-                        }
-
-                        // 2. DatabaseManager Varsa Gönder
-                        if (DatabaseManager.Instance != null)
-                        {
-                            string tur = puanlamaCumleIcinMi ? "Cumle" : "Kelime";
-                            DatabaseManager.Instance.SkoruKaydet(hedef, score, tur);
-                            DatabaseManager.Instance.LogTut("telaffuz_denemesi", score.ToString());
-                        }
+                        string tur = puanlamaCumleIcinMi ? "Cumle" : "Kelime";
+                        DatabaseManager.Instance.SkoruKaydet(hedef, score, tur);
+                        DatabaseManager.Instance.LogTut("telaffuz_denemesi", score.ToString());
                     }
-                    catch (Exception e)
-                    {
-                        // ÇÖKMEK YERİNE HATAYI YAZDIR
-                        Debug.LogError("Manager Hatası: " + e.Message);
-                        if (scoreText)
-                        {
-                            scoreText.text = "Skor: " + score + "\n(Kayıt Hatası!)";
-                            // Hata detayını görmek istersen: scoreText.text += "\n" + e.Message;
-                        }
-                    }
-
-
 
                     if (scoreText)
                     {
@@ -418,6 +388,4 @@ public class SpeechManager : MonoBehaviour
         float similarity = 1.0f - ((float)d[n, m] / maxLen);
         return Mathf.Clamp((int)(similarity * 100), 0, 100);
     }
-
-
 }
