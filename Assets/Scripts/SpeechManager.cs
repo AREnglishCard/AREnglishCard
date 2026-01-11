@@ -7,14 +7,13 @@ using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.UI;
 
 public class SpeechManager : MonoBehaviour
 {
     public static SpeechManager Instance;
 
     [Header("Gemini Ayarları")]
-    private static string geminiApiKey = "AIzaSyBOb9ZiObkh5u-qAUogWPiwDHmaDeIoVJU";
+    private static string geminiApiKey = "AIzaSyAXKCMP8rtMYJc4zpJfS2E-85Gg5W6HkfA";
     private const string API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     [Header("UI Bağlantıları")]
@@ -50,7 +49,6 @@ public class SpeechManager : MonoBehaviour
             Permission.RequestUserPermission(Permission.Microphone);
         }
 #endif
-
         StartCoroutine(MikrofonlariListele());
     }
 
@@ -76,11 +74,19 @@ public class SpeechManager : MonoBehaviour
                 currentDeviceName = Microphone.devices[0];
             }
 
-            if (scoreText) scoreText.text = "Hazır (Kart Göster)";
+            if (scoreText)
+            {
+                scoreText.text = "Hazır (Kart Göster)";
+                scoreText.color = Color.white;
+            }
         }
         else
         {
-            if (scoreText) scoreText.text = "Mikrofon Bulunamadı!";
+            if (scoreText)
+            {
+                scoreText.text = "Mikrofon Bulunamadı!";
+                scoreText.color = Color.red;
+            }
         }
 
         if (buttonLabel) buttonLabel.text = "KELİME PUANLA";
@@ -100,29 +106,54 @@ public class SpeechManager : MonoBehaviour
     {
         aktifKelime = kelime != null ? kelime.Trim() : "";
         aktifCumle = cumle != null ? cumle.Trim() : "";
-        if (scoreText) scoreText.text = "Kart: " + aktifKelime;
+
+        if (scoreText)
+        {
+            scoreText.text = "Kart: " + aktifKelime;
+            scoreText.color = Color.white;
+        }
     }
 
     public void ButonKelimeOku()
     {
-        if (!string.IsNullOrEmpty(aktifKelime) && TTSManager.Instance) TTSManager.Instance.SadeceKelimeyiOku();
+        if (!string.IsNullOrEmpty(aktifKelime) && TTSManager.Instance)
+            TTSManager.Instance.SadeceKelimeyiOku();
     }
 
     public void ButonCumleOku()
     {
-        if (!string.IsNullOrEmpty(aktifCumle) && TTSManager.Instance) TTSManager.Instance.SadeceCumleyiOku();
+        if (!string.IsNullOrEmpty(aktifCumle) && TTSManager.Instance)
+            TTSManager.Instance.SadeceCumleyiOku();
     }
 
     public void ButonMikrofonKelime()
     {
-        if (string.IsNullOrEmpty(aktifKelime)) { if (scoreText) scoreText.text = "Önce kart göster!"; return; }
+        if (string.IsNullOrEmpty(aktifKelime))
+        {
+            if (scoreText)
+            {
+                scoreText.text = "Önce kart göster!";
+                scoreText.color = Color.red;
+            }
+            return;
+        }
+
         puanlamaCumleIcinMi = false;
         ButonMikrofonGenel(buttonLabel);
     }
 
     public void ButonMikrofonCumle()
     {
-        if (string.IsNullOrEmpty(aktifCumle)) { if (scoreText) scoreText.text = "Bu kartta cümle yok!"; return; }
+        if (string.IsNullOrEmpty(aktifCumle))
+        {
+            if (scoreText)
+            {
+                scoreText.text = "Bu kartta cümle yok!";
+                scoreText.color = Color.red;
+            }
+            return;
+        }
+
         puanlamaCumleIcinMi = true;
         ButonMikrofonGenel(buttonLabelCumle);
     }
@@ -133,55 +164,93 @@ public class SpeechManager : MonoBehaviour
         {
             if (Microphone.devices.Length == 0)
             {
-                scoreText.text = "Mikrofon Yok!";
+                if (scoreText)
+                {
+                    scoreText.text = "Mikrofon Yok!";
+                    scoreText.color = Color.red;
+                }
                 return;
             }
+
+            if (string.IsNullOrEmpty(currentDeviceName))
+                currentDeviceName = Microphone.devices[0];
 
             isRecording = true;
             Microphone.End(currentDeviceName); // Temizle
 
             int kayitSuresi = puanlamaCumleIcinMi ? 8 : 4;
 
-            // DÜZELTME: Frekansı elle vermiyoruz, cihaz ne istiyorsa onu veriyoruz (maxFreq)
+            // Cihazın frekansını al
             Microphone.GetDeviceCaps(currentDeviceName, out int minFreq, out int maxFreq);
-            int finalFreq = (maxFreq > 0) ? maxFreq : 44100; // Cihaz ne destekliyorsa o, yoksa 44100
+            int finalFreq = (maxFreq > 0) ? maxFreq : 44100;
 
             try
             {
                 recordingClip = Microphone.Start(currentDeviceName, false, kayitSuresi, finalFreq);
 
-                if (scoreText) scoreText.text = "DİNLİYORUM...";
-                if (scoreText) scoreText.color = Color.yellow;
+                if (scoreText)
+                {
+                    scoreText.text = "DİNLİYORUM...";
+                    scoreText.color = Color.yellow;
+                }
+
                 if (labelToChange) labelToChange.text = "BİTİR";
             }
             catch (Exception e)
             {
                 Debug.LogError("Mikrofon Hatası: " + e.Message);
-                scoreText.text = "Mic Başlatılamadı!";
+
+                if (scoreText)
+                {
+                    scoreText.text = "Mic Başlatılamadı!";
+                    scoreText.color = Color.red;
+                }
+
                 isRecording = false;
+
+                if (labelToChange)
+                    labelToChange.text = puanlamaCumleIcinMi ? "CÜMLE PUANLA" : "KELİME PUANLA";
             }
         }
         else
         {
+            // KAYDI BİTİR
             isRecording = false;
 
-            // Eğer Unity kaydı kendiliğinden durdurduysa (süre bittiyse) pozisyon sıfırlanmış olabilir
             int position = Microphone.GetPosition(currentDeviceName);
             Microphone.End(currentDeviceName);
 
-            if (scoreText) scoreText.text = "Analiz...";
-            if (labelToChange) labelToChange.text = puanlamaCumleIcinMi ? "CÜMLE PUANLA" : "KELİME PUANLA";
+            if (labelToChange)
+                labelToChange.text = puanlamaCumleIcinMi ? "CÜMLE PUANLA" : "KELİME PUANLA";
 
-            // Eğer süre dolup durduysa position 0 dönebilir, bu durumda tüm klibi al
+            if (scoreText)
+            {
+                scoreText.text = "Analiz...";
+                scoreText.color = Color.white;
+            }
+
+            if (recordingClip == null)
+            {
+                if (scoreText)
+                {
+                    scoreText.text = "Kayıt alınamadı!";
+                    scoreText.color = Color.red;
+                }
+                return;
+            }
+
+            // Süre dolup kendi durduysa 0 dönebilir
             if (position <= 0) position = recordingClip.samples;
 
             byte[] wavData = ConvertToWav(recordingClip, position);
 
-            // Wav datası null ise ses 0 demektir (ConvertToWav içinde kontrol var)
             if (wavData == null)
             {
-                scoreText.text = "MİKROFON SES ALMIYOR\n(Ses Seviyesi: 0)";
-                scoreText.color = Color.red;
+                if (scoreText)
+                {
+                    scoreText.text = "MİKROFON SES ALMIYOR\n(Ses Seviyesi: 0)";
+                    scoreText.color = Color.red;
+                }
                 return;
             }
 
@@ -194,7 +263,8 @@ public class SpeechManager : MonoBehaviour
         string url = $"{API_URL}?key={geminiApiKey}";
         string base64Audio = Convert.ToBase64String(audioData);
 
-        string promptText = "Transcribe the audio exactly. If it is silence or unintelligible noise, return 'SILENCE'. Do not provide explanations.";
+        string promptText =
+            "Transcribe the audio exactly. If it is silence or unintelligible noise, return 'SILENCE'. Do not provide explanations.";
 
         string jsonBody = $@"
         {{
@@ -229,8 +299,13 @@ public class SpeechManager : MonoBehaviour
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                if (scoreText) scoreText.text = "İnternet/API Hatası";
-                scoreText.color = Color.red;
+                Debug.LogError("Gemini Hatası: " + request.error);
+
+                if (scoreText)
+                {
+                    scoreText.text = "İnternet/API Hatası";
+                    scoreText.color = Color.red;
+                }
             }
             else
             {
@@ -238,57 +313,73 @@ public class SpeechManager : MonoBehaviour
                 string spokenText = ExtractTextFromJson(responseText);
                 Debug.Log("GEMINI: " + spokenText);
 
-                if (spokenText.Contains("SILENCE") || spokenText.Contains("sure"))
+                if (string.IsNullOrWhiteSpace(spokenText) || spokenText == "???" || spokenText == "Hata")
                 {
                     if (scoreText)
                     {
                         scoreText.text = "ANLAŞILMADI\nTekrar Dene";
                         scoreText.color = Color.red;
                     }
+                    yield break;
                 }
-                else
+
+                if (spokenText.Contains("SILENCE") || spokenText.ToLower().Contains("sure"))
                 {
-                    string hedef = puanlamaCumleIcinMi ? aktifCumle : aktifKelime;
-                    int score = CalculateScore(hedef, spokenText);
-
-                    if (DatabaseManager.Instance != null)
-                    {
-                        string tur = puanlamaCumleIcinMi ? "Cumle" : "Kelime";
-                        DatabaseManager.Instance.SkoruKaydet(hedef, score, tur);
-                        DatabaseManager.Instance.LogTut("telaffuz_denemesi", score.ToString());
-                    }
-
                     if (scoreText)
                     {
-                        if (score >= 80)
-                        {
-                            scoreText.text = $"HARİKA!\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
-                            scoreText.color = Color.green;
-                        }
-                        else if (score >= 50)
-                        {
-                            scoreText.text = $"İYİ\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
-                            scoreText.color = new Color(1f, 0.64f, 0f);
-                        }
-                        else
-                        {
-                            scoreText.text = $"YANLIŞ\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
-                            scoreText.color = Color.red;
-                        }
+                        scoreText.text = "ANLAŞILMADI\nTekrar Dene";
+                        scoreText.color = Color.red;
+                    }
+                    yield break;
+                }
+
+                string hedef = puanlamaCumleIcinMi ? aktifCumle : aktifKelime;
+                int score = CalculateScore(hedef, spokenText);
+
+                // ✅ KRİTİK: GameManager'a haber ver (kart diğerine geçsin)
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.OnSpeechScoreReceived(score);
+                }
+
+                if (DatabaseManager.Instance != null)
+                {
+                    string tur = puanlamaCumleIcinMi ? "Cumle" : "Kelime";
+                    DatabaseManager.Instance.SkoruKaydet(hedef, score, tur);
+                    DatabaseManager.Instance.LogTut("telaffuz_denemesi", score.ToString());
+                }
+
+                if (scoreText)
+                {
+                    if (score >= 80)
+                    {
+                        scoreText.text = $"HARİKA!\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
+                        scoreText.color = Color.green;
+                    }
+                    else if (score >= 50)
+                    {
+                        scoreText.text = $"İYİ\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
+                        scoreText.color = new Color(1f, 0.64f, 0f);
+                    }
+                    else
+                    {
+                        scoreText.text = $"YANLIŞ\nDoğruluk: %{score}\nAlgılanan: {spokenText}";
+                        scoreText.color = Color.red;
                     }
                 }
             }
         }
     }
 
-    public class BypassCertificate : CertificateHandler { protected override bool ValidateCertificate(byte[] certificateData) { return true; } }
+    public class BypassCertificate : CertificateHandler
+    {
+        protected override bool ValidateCertificate(byte[] certificateData) { return true; }
+    }
 
-    // DÜZELTME: Artık frekansı klipten okuyoruz, sincap sesi olmasın diye
     byte[] ConvertToWav(AudioClip clip, int position)
     {
         using (MemoryStream stream = new MemoryStream())
         {
-            // GERÇEK FREKANSI AL
             int sampleRate = clip.frequency;
             int channels = clip.channels;
 
@@ -309,22 +400,15 @@ public class SpeechManager : MonoBehaviour
             float[] data = new float[position * channels];
             clip.GetData(data, 0);
 
-            // SES VAR MI KONTROLÜ
             float maxSignal = 0f;
             foreach (var sample in data)
-            {
                 if (Mathf.Abs(sample) > maxSignal) maxSignal = Mathf.Abs(sample);
-            }
 
             Debug.Log($"SES SİNYAL GÜCÜ: {maxSignal}");
 
-            // Eğer ses 0 ise boşuna gönderme, hata ver (Debug için)
             if (maxSignal < 0.0000001f)
-            {
                 return null;
-            }
 
-            // AUTO-BOOST
             float boost = 0.98f / maxSignal;
 
             foreach (var sample in data)
@@ -332,6 +416,7 @@ public class SpeechManager : MonoBehaviour
                 short intSample = (short)(Mathf.Clamp(sample * boost, -1f, 1f) * 32767f);
                 stream.Write(BitConverter.GetBytes(intSample), 0, 2);
             }
+
             return stream.ToArray();
         }
     }
@@ -345,9 +430,13 @@ public class SpeechManager : MonoBehaviour
             if (start == -1) return "???";
             start += marker.Length;
             int end = json.IndexOf("\"", start);
+            if (end == -1) return "???";
             return json.Substring(start, end - start).Replace("\\n", "").Trim();
         }
-        catch { return "Hata"; }
+        catch
+        {
+            return "Hata";
+        }
     }
 
     string Temizle(string text)
@@ -367,23 +456,33 @@ public class SpeechManager : MonoBehaviour
     {
         string s = Temizle(target);
         string t = Temizle(received);
+
         if (string.IsNullOrEmpty(t)) return 0;
         if (s == t) return 100;
 
-        int n = s.Length; int m = t.Length;
-        int[,] d = new int[n + 1, m + 1];
+        int n = s.Length;
+        int m = t.Length;
+
         if (n == 0) return m == 0 ? 100 : 0;
         if (m == 0) return 0;
+
+        int[,] d = new int[n + 1, m + 1];
+
         for (int i = 0; i <= n; d[i, 0] = i++) { }
         for (int j = 0; j <= m; d[0, j] = j++) { }
+
         for (int i = 1; i <= n; i++)
         {
             for (int j = 1; j <= m; j++)
             {
                 int cost = (t[j - 1] == s[i - 1]) ? 0 : 1;
-                d[i, j] = Mathf.Min(Mathf.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+                d[i, j] = Mathf.Min(
+                    Mathf.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                    d[i - 1, j - 1] + cost
+                );
             }
         }
+
         float maxLen = Mathf.Max(n, m);
         float similarity = 1.0f - ((float)d[n, m] / maxLen);
         return Mathf.Clamp((int)(similarity * 100), 0, 100);

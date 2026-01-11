@@ -3,7 +3,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine.UI;
 using System.Collections;
-using UnityEngine.SceneManagement; // SAHNE YÖNETÝMÝ ÝÇÝN GEREKLÝ
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviourPunCallbacks
 {
@@ -17,7 +17,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     [Header("Oyun Ayarlarý")]
     public string[] wordPool = { "cat", "dog", "bird", "car", "apple", "banana" };
     public float gameDuration = 60f;
-    public string mainMenuSceneName = "MainMenu"; 
+    public string mainMenuSceneName = "MainMenu";
 
     // Private Deðiþkenler
     private float currentTimer;
@@ -25,7 +25,7 @@ public class GameManager : MonoBehaviourPunCallbacks
     private int myScore = 0;
     private int opponentScore = 0;
 
-    // Döngü Kontrolü
+    // Tur kontrol
     private string currentTargetWord = "";
     private bool hasShownCard = false;
     private bool hasSpoken = false;
@@ -33,18 +33,19 @@ public class GameManager : MonoBehaviourPunCallbacks
     private void Awake()
     {
         if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        else { Destroy(gameObject); return; }
     }
-   
 
     void Start()
     {
         currentTimer = gameDuration;
+        myScore = 0;
+        opponentScore = 0;
         UpdateScoreUI();
 
         if (!PhotonNetwork.IsConnected)
         {
-            infoText.text = "TEK OYUNCULU MOD";
+            SetInfo("TEK OYUNCULU MOD", Color.white);
             StartGameLogic();
         }
         else
@@ -52,13 +53,13 @@ public class GameManager : MonoBehaviourPunCallbacks
             if (PhotonNetwork.IsMasterClient)
             {
                 if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
-                    photonView.RPC("RPC_StartGame", RpcTarget.All);
+                    photonView.RPC(nameof(RPC_StartGame), RpcTarget.All);
                 else
-                    infoText.text = "OYUNCU BEKLENÝYOR";
+                    SetInfo("OYUNCU BEKLENÝYOR", Color.white);
             }
             else
             {
-                infoText.text = "KURUCU BEKLENÝYOR...";
+                SetInfo("KURUCU BEKLENÝYOR...", Color.white);
             }
         }
     }
@@ -66,27 +67,24 @@ public class GameManager : MonoBehaviourPunCallbacks
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         if (PhotonNetwork.IsMasterClient && PhotonNetwork.CurrentRoom.PlayerCount == 2)
-        {
-            photonView.RPC("RPC_StartGame", RpcTarget.All);
-        }
+            photonView.RPC(nameof(RPC_StartGame), RpcTarget.All);
     }
 
     [PunRPC]
     public void RPC_StartGame()
     {
-        infoText.text = "RAKÝP GELDÝ! BAÞLIYORUZ!";
-        infoText.color = Color.green;
+        SetInfo("RAKÝP GELDÝ! BAÞLIYORUZ!", Color.green);
         StartCoroutine(StartCountdown());
     }
 
     IEnumerator StartCountdown()
     {
         yield return new WaitForSeconds(1f);
-        infoText.text = "3...";
+        SetInfo("3...", Color.white);
         yield return new WaitForSeconds(1f);
-        infoText.text = "2...";
+        SetInfo("2...", Color.white);
         yield return new WaitForSeconds(1f);
-        infoText.text = "1...";
+        SetInfo("1...", Color.white);
         yield return new WaitForSeconds(1f);
 
         StartGameLogic();
@@ -96,56 +94,32 @@ public class GameManager : MonoBehaviourPunCallbacks
     {
         isGameRunning = true;
         currentTimer = gameDuration;
+
+        // skor reset
         myScore = 0;
         opponentScore = 0;
+        UpdateScoreUI();
+
         NextTurn();
-    }
-
-    void NextTurn()
-    {
-        if (!isGameRunning) return;
-
-        hasShownCard = false;
-        hasSpoken = false;
-
-        if (wordPool.Length > 0)
-        {
-            string yeniKelime = "";
-            if (wordPool.Length > 1)
-            {
-                do { yeniKelime = wordPool[Random.Range(0, wordPool.Length)]; }
-                while (yeniKelime == currentTargetWord);
-            }
-            else { yeniKelime = wordPool[0]; }
-
-            currentTargetWord = yeniKelime;
-
-            infoText.text = "HEDEF: " + currentTargetWord.ToUpper();
-            infoText.color = Color.blue;
-
-            if (SpeechManager.Instance != null)
-                SpeechManager.Instance.HedefGuncelle(currentTargetWord, "This is a " + currentTargetWord);
-        }
     }
 
     void Update()
     {
-        if (isGameRunning)
+        if (!isGameRunning) return;
+
+        currentTimer -= Time.deltaTime;
+        if (timerText) timerText.text = Mathf.CeilToInt(Mathf.Max(0f, currentTimer)).ToString();
+
+        // Multiplayer: sadece master bitirir
+        if (PhotonNetwork.IsConnected)
         {
-            currentTimer -= Time.deltaTime;
-            timerText.text = Mathf.CeilToInt(currentTimer).ToString();
-
-            // Sadece MasterClient bitirme emrini verir
-            if (PhotonNetwork.IsMasterClient && currentTimer <= 0)
-            {
-                photonView.RPC("RPC_FinishGame", RpcTarget.All);
-            }
-
-            // Single Player ise direkt bitir
-            if (!PhotonNetwork.IsConnected && currentTimer <= 0)
-            {
+            if (PhotonNetwork.IsMasterClient && currentTimer <= 0f)
+                photonView.RPC(nameof(RPC_FinishGame), RpcTarget.All);
+        }
+        else
+        {
+            if (currentTimer <= 0f)
                 EndGameLocal();
-            }
         }
     }
 
@@ -157,105 +131,154 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     void EndGameLocal()
     {
+        if (!isGameRunning) return;
+
         isGameRunning = false;
-        timerText.text = "0";
-        string resultMessage = "";
+        if (timerText) timerText.text = "0";
+
+        string resultMessage;
 
         if (!PhotonNetwork.IsConnected)
         {
             resultMessage = "OYUN BÝTTÝ!\nSkorun: " + myScore;
-            infoText.color = Color.white;
+            SetInfo(resultMessage, Color.white);
         }
         else
         {
             if (myScore > opponentScore)
-            {
-                resultMessage = "KAZANDIN!\nTEBRÝKLER";
-                infoText.color = Color.green;
-            }
+                SetInfo("KAZANDIN!\nTEBRÝKLER", Color.green);
             else if (myScore < opponentScore)
-            {
-                resultMessage = "KAYBETTÝN...";
-                infoText.color = Color.red;
-            }
+                SetInfo("KAYBETTÝN...", Color.red);
             else
-            {
-                resultMessage = "BERABERE!";
-                infoText.color = Color.yellow;
-            }
+                SetInfo("BERABERE!", Color.yellow);
         }
 
-        infoText.text = resultMessage;
-
-        // --- BURADA MENÜYE DÖNME SÜRECÝNÝ BAÞLATIYORUZ ---
         StartCoroutine(ReturnToMenuRoutine());
     }
 
-    // --- MENÜYE DÖNÜÞ KODLARI ---
     IEnumerator ReturnToMenuRoutine()
     {
-        // 1. Oyuncular sonucu görsün diye 5 saniye bekle
         yield return new WaitForSeconds(5f);
 
         if (PhotonNetwork.IsConnected)
         {
-            infoText.text = "MENÜYE DÖNÜLÜYOR...";
-            PhotonNetwork.LeaveRoom(); // Odadan çýk (Bu OnLeftRoom'u tetikler)
+            SetInfo("MENÜYE DÖNÜLÜYOR...", Color.white);
+            PhotonNetwork.LeaveRoom();
         }
         else
         {
-            // Offline ise direkt sahne deðiþtir
             SceneManager.LoadScene(mainMenuSceneName);
         }
     }
 
-    // Odadan çýkýþ tamamlanýnca otomatik çalýþýr
     public override void OnLeftRoom()
     {
-        // Ana Menü sahnesine geç
         SceneManager.LoadScene(mainMenuSceneName);
     }
-    // ----------------------------------------------------
 
+    // ===================== TUR / HEDEF =====================
+
+    void NextTurn()
+    {
+        if (!isGameRunning) return;
+
+        hasShownCard = false;
+        hasSpoken = false;
+
+        if (wordPool == null || wordPool.Length == 0)
+        {
+            SetInfo("Kelime havuzu boþ!", Color.red);
+            return;
+        }
+
+        string yeniKelime = currentTargetWord;
+
+        // Ayný kelimeyi üst üste getirmemeye çalýþ
+        if (wordPool.Length == 1)
+        {
+            yeniKelime = wordPool[0];
+        }
+        else
+        {
+            int safety = 0;
+            while (yeniKelime == currentTargetWord && safety < 25)
+            {
+                yeniKelime = wordPool[Random.Range(0, wordPool.Length)];
+                safety++;
+            }
+        }
+
+        currentTargetWord = (yeniKelime ?? "").Trim();
+
+        SetInfo("HEDEF: " + currentTargetWord.ToUpper(), Color.blue);
+
+        if (SpeechManager.Instance != null)
+            SpeechManager.Instance.HedefGuncelle(currentTargetWord, "This is a " + currentTargetWord);
+    }
+
+    // ===================== DIÞTAN GELEN EVENTLER =====================
+
+    // Kart algýlandý (Vuforia vs)
     public void OnCardDetected(string cardName)
     {
-        if (isGameRunning && !hasShownCard && cardName.Trim().ToLower() == currentTargetWord.Trim().ToLower())
+        if (!isGameRunning) return;
+        if (hasShownCard) return;
+
+        if (string.IsNullOrWhiteSpace(cardName)) return;
+
+        string a = cardName.Trim().ToLower();
+        string b = (currentTargetWord ?? "").Trim().ToLower();
+
+        if (a == b && !string.IsNullOrEmpty(b))
         {
             hasShownCard = true;
             AddScore(10);
-            infoText.text = $"DOÐRU KART!\nÞÝMDÝ OKU: {currentTargetWord.ToUpper()}";
-            infoText.color = Color.yellow;
+
+            SetInfo($"DOÐRU KART!\nÞÝMDÝ OKU: {currentTargetWord.ToUpper()}", Color.yellow);
         }
     }
 
+    // SpeechManager skor döndürdü
     public void OnSpeechScoreReceived(int score)
     {
-        if (isGameRunning && !hasSpoken)
-        {
-            if (!hasShownCard) { infoText.text = "ÖNCE KARTI GÖSTER!"; return; }
+        if (!isGameRunning) return;
 
-            hasSpoken = true;
-            AddScore(score);
-            StartCoroutine(WaitAndNextTurn(score));
+        // Kart gösterilmediyse konuþma turu bitirmesin
+        if (!hasShownCard)
+        {
+            SetInfo("ÖNCE KARTI GÖSTER!", Color.red);
+            return;
         }
+
+        // Zaten konuþulduysa tekrar tetikleme (double click / iki coroutine vb)
+        if (hasSpoken) return;
+
+        hasSpoken = true;
+
+        int safeScore = Mathf.Clamp(score, 0, 100);
+        AddScore(safeScore);
+
+        StartCoroutine(WaitAndNextTurn(safeScore));
     }
 
     IEnumerator WaitAndNextTurn(int lastScore)
     {
-        infoText.text = $"HARÝKA! (+{lastScore})";
-        infoText.color = Color.green;
+        SetInfo($"HARÝKA! (+{lastScore})", Color.green);
         yield return new WaitForSeconds(1.5f);
         NextTurn();
     }
 
+    // ===================== SKOR =====================
+
     public void AddScore(int amount)
     {
         if (!isGameRunning) return;
+
         myScore += amount;
         UpdateScoreUI();
 
-        if (PhotonNetwork.IsConnected)
-            photonView.RPC("RPC_UpdateOpponentScore", RpcTarget.Others, myScore);
+        if (PhotonNetwork.IsConnected && photonView != null)
+            photonView.RPC(nameof(RPC_UpdateOpponentScore), RpcTarget.Others, myScore);
     }
 
     [PunRPC]
@@ -267,9 +290,26 @@ public class GameManager : MonoBehaviourPunCallbacks
 
     void UpdateScoreUI()
     {
+        if (!scoreText) return;
+
         if (PhotonNetwork.IsConnected)
             scoreText.text = $"BEN: {myScore} - RAKÝP: {opponentScore}";
         else
             scoreText.text = $"SKOR: {myScore}";
+    }
+
+    // ===================== UI YARDIMCI =====================
+
+    void SetInfo(string msg, Color c)
+    {
+        if (infoText)
+        {
+            infoText.text = msg;
+            infoText.color = c;
+        }
+        else
+        {
+            Debug.Log(msg);
+        }
     }
 }
