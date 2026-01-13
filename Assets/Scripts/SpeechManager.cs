@@ -162,6 +162,8 @@ public class SpeechManager : MonoBehaviour
     {
         if (!isRecording)
         {
+            // --- 1. MİKROFONU AÇMA (BAŞLATMA) ---
+
             if (Microphone.devices.Length == 0)
             {
                 if (scoreText)
@@ -188,6 +190,12 @@ public class SpeechManager : MonoBehaviour
             {
                 recordingClip = Microphone.Start(currentDeviceName, false, kayitSuresi, finalFreq);
 
+                // [GÖRSEL] -> DİNLİYORUM MODU (State 1)
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.UpdateButtonImage(1);
+                }
+
                 if (scoreText)
                 {
                     scoreText.text = "DİNLİYORUM...";
@@ -206,6 +214,10 @@ public class SpeechManager : MonoBehaviour
                     scoreText.color = Color.red;
                 }
 
+                // [GÖRSEL] -> HATA OLDU, BAŞA DÖN (State 0)
+                if (GameManager.Instance != null)
+                    GameManager.Instance.UpdateButtonImage(0);
+
                 isRecording = false;
 
                 if (labelToChange)
@@ -214,7 +226,8 @@ public class SpeechManager : MonoBehaviour
         }
         else
         {
-            // KAYDI BİTİR
+            // --- 2. KAYDI BİTİRME VE ANALİZ ---
+
             isRecording = false;
 
             int position = Microphone.GetPosition(currentDeviceName);
@@ -229,6 +242,12 @@ public class SpeechManager : MonoBehaviour
                 scoreText.color = Color.white;
             }
 
+            // [GÖRSEL] -> ANALİZ MODU (State 2)
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.UpdateButtonImage(2);
+            }
+
             if (recordingClip == null)
             {
                 if (scoreText)
@@ -236,10 +255,12 @@ public class SpeechManager : MonoBehaviour
                     scoreText.text = "Kayıt alınamadı!";
                     scoreText.color = Color.red;
                 }
+                // Hata varsa görseli düzelt
+                if (GameManager.Instance != null) GameManager.Instance.UpdateButtonImage(0);
                 return;
             }
 
-            // Süre dolup kendi durduysa 0 dönebilir
+            // Süre dolup kendi durduysa pozisyon 0 dönebilir, onu düzeltiyoruz
             if (position <= 0) position = recordingClip.samples;
 
             byte[] wavData = ConvertToWav(recordingClip, position);
@@ -251,6 +272,8 @@ public class SpeechManager : MonoBehaviour
                     scoreText.text = "MİKROFON SES ALMIYOR\n(Ses Seviyesi: 0)";
                     scoreText.color = Color.red;
                 }
+                // Sessizlik hatası varsa görseli düzelt (State 0)
+                if (GameManager.Instance != null) GameManager.Instance.UpdateButtonImage(0);
                 return;
             }
 
@@ -369,6 +392,7 @@ public class SpeechManager : MonoBehaviour
                 }
             }
         }
+        if (GameManager.Instance != null) GameManager.Instance.UpdateButtonImage(0);
     }
 
     public class BypassCertificate : CertificateHandler

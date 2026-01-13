@@ -14,6 +14,12 @@ public class GameManager : MonoBehaviourPunCallbacks
     public Text timerText;
     public Text scoreText;
 
+    [Header("Buton Görsel Ayarlarý")]
+    public Image butonImage;        // Inspector'dan butonun üzerindeki Image bileþenini buraya sürükle
+    public Sprite imgKelimeDinle;   // 1. Durum (Varsayýlan)
+    public Sprite imgDinliyorum;    // 2. Durum (Mikrofon açýk)
+    public Sprite imgAnaliz;        // 3. Durum (Gemini Bekleniyor)
+
     [Header("Oyun Ayarlarý")]
     public string[] wordPool = { "cat", "dog", "bird", "car", "apple", "banana" };
     public float gameDuration = 60f;
@@ -305,11 +311,32 @@ public class GameManager : MonoBehaviourPunCallbacks
         if (infoText)
         {
             infoText.text = msg;
-            infoText.color = c;
+            //infoText.color = c;
         }
         else
         {
             Debug.Log(msg);
+        }
+    }
+
+    public void UpdateButtonImage(int state)
+    {
+        if (butonImage == null) return;
+
+        switch (state)
+        {
+            case 0:
+                if (imgKelimeDinle) butonImage.sprite = imgKelimeDinle;
+                break;
+            case 1:
+                if (imgDinliyorum) butonImage.sprite = imgDinliyorum;
+                break;
+            case 2:
+                if (imgAnaliz) butonImage.sprite = imgAnaliz;
+                break;
+            default:
+                if (imgKelimeDinle) butonImage.sprite = imgKelimeDinle;
+                break;
         }
     }
 }
